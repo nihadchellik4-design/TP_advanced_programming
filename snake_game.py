@@ -50,9 +50,14 @@ class Game:
         self.food.draw()
     def update(self):
         self.snake.move()
+        self.check_collision_with_food()
+    def check_collision_with_food (self):
+        if self.food.position == self.snake.snake_body[0]: #collision with the head of the snake
+           self.food.position = self.food.generate_random_pos() #ki tsra collision entre food and snake ttbdel postion ta3 l food
+
+
+
 game = Game()
-
-
 screen = pygame.display.set_mode((cell_size * number_of_cells, cell_size * number_of_cells))
 pygame.display.set_caption("Snake Game")
 
