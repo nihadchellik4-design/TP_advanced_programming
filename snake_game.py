@@ -5,25 +5,34 @@ from pygame.math import Vector2
 
 pygame.init()
 
-GREEN = (173, 204, 97)
-DARK_GREEN = (0, 128, 0)
+title_font = pygame.font.Font(None,60)
+score_font = pygame.font.Font(None,40)
 
-cell_size = 30
+GREEN = (173, 204, 96)
+DARK_GREEN = (43, 51, 24)
+
+cell_size = 20
 number_of_cells = 20
+OFFSET = 75
 
 
 class Food:
-    def __init__(self):
-        self.position = self.generate_random_pos()
+    def __init__(self,snake_body):
+        self.position = self.generate_random_pos(snake_body)
 
     def draw(self):
-        food_rec = pygame.Rect(self.position.x * cell_size, self.position.y * cell_size, cell_size, cell_size)
+        food_rec = pygame.Rect(OFFSET+ self.position.x * cell_size,OFFSET+  self.position.y * cell_size, cell_size, cell_size)
         screen.blit(food_surface, food_rec)
 
-    def generate_random_pos(self):
+    def generate_random_cell(self):
         x = random.randint(0, number_of_cells - 1)
         y = random.randint(0, number_of_cells - 1)
-        position = Vector2(x, y)
+        return Vector2(x, y)
+
+    def generate_random_pos(self, snake_body):
+        position = self.generate_random_cell()
+        while position in snake_body:
+             position = self.generate_random_cell()
         return position
 
 
@@ -31,34 +40,69 @@ class Snake:
     def __init__(self):
         self.snake_body = [Vector2(6, 9), Vector2(5, 9), Vector2(4, 9)]
         self.direction = Vector2(1, 0)
-
+        self.add_segment = False
+        self.eat_sound = pygame.mixer.Sound("snake_eat.wav")
+        self.wall_hit_sound = pygame.mixer.Sound("snake_collision.wav")
     def draw(self):
         for seg in self.snake_body:
-            seg_rect = pygame.Rect(seg.x * cell_size, seg.y * cell_size, cell_size, cell_size)
+            seg_rect = pygame.Rect(OFFSET+ seg.x * cell_size,OFFSET+ seg.y * cell_size, cell_size, cell_size)
             pygame.draw.rect(screen, DARK_GREEN, seg_rect, 0, 7)
 
-    def move(self):
-        body_copy = self.snake_body[:-1]
-        body_copy.insert(0, self.snake_body[0] + self.direction)
-        self.snake_body = body_copy
+    def update(self):
+       self.snake_body.insert(0, self.snake_body[0] + self.direction)
+       if self.add_segment == True:
+          self.add_segment = False
+       else:
+          self.snake_body = self.snake_body[:-1]
+    def reset(self):
+        self.snake_body =  [Vector2(6, 9), Vector2(5, 9), Vector2(4, 9)]
+        self.direction = Vector2(1, 0)
 class Game:
     def __init__(self):
         self.snake = Snake()
-        self.food = Food()
+        self.food = Food(self.snake.snake_body)
+        self.state ="RUNNING"
+        self.score = 0
+
     def draw(self):
         self.snake.draw()
         self.food.draw()
+
     def update(self):
-        self.snake.move()
-        self.check_collision_with_food()
-    def check_collision_with_food (self):
-        if self.food.position == self.snake.snake_body[0]: #collision with the head of the snake
-           self.food.position = self.food.generate_random_pos() #ki tsra collision entre food and snake ttbdel postion ta3 l food
+      if self.state == "RUNNING":
+         self.snake.update()
+         self.check_collision_with_food()
+         self.check_collision_with_edges()
+         self.check_collision_with_tail()
 
 
+    def check_collision_with_food(self):
+        if self.snake.snake_body[0] == self.food.position:
+          self.food.position = self.food.generate_random_pos(self.snake.snake_body) 
+          self. snake.add_segment = True
+          self.score += 1
+          self.snake.eat_sound.play()
+
+    def  check_collision_with_edges(self):
+        if self.snake.snake_body[0].x == number_of_cells or self.snake.snake_body[0].x == -1:
+            self.game_over()  
+        if self.snake.snake_body[0].y == number_of_cells or self.snake.snake_body[0].y == -1:  
+              self.game_over()
+
+    def game_over(self):
+       self.snake.reset()
+       self.food.position = self.food.generate_random_pos(self.snake.snake_body)   
+       self.state = "STOPPED"  ""
+       self.score = 0
+       self.snake.wall_hit_sound.play()
+
+    def check_collision_with_tail(self):
+        headless_body = self.snake.snake_body[1:]        
+        if self.snake.snake_body[0] in headless_body:
+            self.game_over()        
 
 game = Game()
-screen = pygame.display.set_mode((cell_size * number_of_cells, cell_size * number_of_cells))
+screen = pygame.display.set_mode((2*OFFSET + cell_size * number_of_cells, 2*OFFSET + cell_size * number_of_cells))
 pygame.display.set_caption("Snake Game")
 
 
@@ -83,6 +127,10 @@ while running:
             game.update()
 
         if event.type == pygame.KEYDOWN:
+            if game.state == "STOPPED":
+                game.state ="RUNNING"
+
+        if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP and game.snake.direction != Vector2(0, 1):
                 game.snake.direction = Vector2(0, -1)
             if event.key == pygame.K_DOWN and game.snake.direction != Vector2(0, -1):
@@ -97,7 +145,14 @@ while running:
             sys.exit()
 
     screen.fill(GREEN)
+    pygame.draw.rect(screen, DARK_GREEN, (OFFSET-5, OFFSET-5, cell_size*number_of_cells+10,cell_size*number_of_cells+10) , 5 )
     game.draw()
+
+    title_surface = title_font.render("Snake Game", True , DARK_GREEN)
+    score_surface = score_font.render(str(game.score), True, DARK_GREEN)
+    screen.blit(title_surface,(OFFSET-5, 20))
+    screen.blit(score_surface, (OFFSET-5, OFFSET +cell_size*number_of_cells+10 ))
+
     pygame.display.update()
     clock.tick(60)
 

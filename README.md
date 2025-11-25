@@ -11,3 +11,21 @@ Steps of our project:
     -
 4- Moving the Snake:
     -
+5- Check_collision_with_food
+    -
+6- Making the snake grow longer
+    -
+7- Check_collision_with_edges
+    -
+8- Check_collision_with_tail
+    -
+9- Game over
+    -
+10- Making the snake grow longer
+    -
+11- Adding title and frame
+    -
+12- Keeping score
+    -
+13- Adding sounds
+    -
