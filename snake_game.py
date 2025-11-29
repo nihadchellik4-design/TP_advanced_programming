@@ -351,10 +351,9 @@ def get_player_info():
         clock.tick(30)
 
 
-# NEW: Get player info first
+
 player_id, player_name = get_player_info()
 
-# Original code from here
 screen = pygame.display.set_mode((2*OFFSET + cell_size * number_of_cells, 2*OFFSET + cell_size * number_of_cells))
 pygame.display.set_caption("Snake Game")
 
