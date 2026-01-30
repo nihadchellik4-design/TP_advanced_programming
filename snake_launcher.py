@@ -14,10 +14,13 @@ TEXT_COLOR = (236, 240, 241)
 SUBTITLE_COLOR = (149, 165, 166)
 SUCCESS_GREEN = (46, 204, 113)
 WARNING_RED = (231, 76, 60)
+GOLD = (255, 215, 0)
+PURPLE = (155, 89, 182)
+PURPLE_HOVER = (142, 68, 173)
 
 # Screen settings
 SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_HEIGHT = 650
 
 class Button:
     def __init__(self, x, y, width, height, text, color, hover_color, action):
@@ -51,7 +54,7 @@ class Button:
 class MainMenu:
     def __init__(self):
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("🐍 Snake Game - Main Menu")
+        pygame.display.set_caption("Snake Game - Main Menu")
         
         self.clock = pygame.time.Clock()
         self.running = True
@@ -63,65 +66,57 @@ class MainMenu:
         self.small_font = pygame.font.Font(None, 28)
         
         # Create buttons
-        button_width = 400
-        button_height = 70
+        button_width = 450
+        button_height = 75
         button_x = (SCREEN_WIDTH - button_width) // 2
-        start_y = 220
+        start_y = 200
         spacing = 90
         
         self.buttons = [
             Button(button_x, start_y, button_width, button_height,
-                   "🎮 Single Player", ACCENT_BLUE, ACCENT_HOVER,
-                   self.launch_single_player),
+                   "Premium (Levels + Themes)", GOLD, (230, 180, 0),
+                   self.launch_premium),
             Button(button_x, start_y + spacing, button_width, button_height,
-                   "👥 Multiplayer (Host Server)", SUCCESS_GREEN, (39, 174, 96),
-                   self.launch_multiplayer_server),
+                   "Local Multiplayer", PURPLE, PURPLE_HOVER,
+                   self.launch_2players_local),
             Button(button_x, start_y + spacing * 2, button_width, button_height,
-                   "🌐 Multiplayer (Join Game)", SUCCESS_GREEN, (39, 174, 96),
+                   "Multiplayer (Join)", SUCCESS_GREEN, (39, 174, 96),
                    self.launch_multiplayer_client),
             Button(button_x, start_y + spacing * 3, button_width, button_height,
-                   "❌ Exit", WARNING_RED, (192, 57, 43),
+                   "Exit", WARNING_RED, (192, 57, 43),
                    self.quit_game)
         ]
         
-    def launch_single_player(self):
-        """Launch single player mode"""
-        print("🎮 Launching Single Player Mode...")
+    def launch_premium(self):
+        """Launch premium version with levels and color themes"""
+        print("Launching Premium Version...")
         self.running = False
         try:
-            subprocess.run([sys.executable, "snake_game_modern.py"])
+            subprocess.run([sys.executable, "snake_server.py"])
         except FileNotFoundError:
-            print("❌ Error: snake_game_modern.py not found!")
+            print("Error: snake_server.py not found!")
     
-    def launch_multiplayer_server(self):
-        """Launch multiplayer server"""
-        print("🖥️ Launching Multiplayer Server...")
+    def launch_2players_local(self):
+        """Launch 2 players local mode"""
+        print("Launching Local Multiplayer Mode...")
         self.running = False
         try:
-            # Start server in a separate process
-            server_process = subprocess.Popen([sys.executable, "snake_server.py"])
-            # Give server time to start
-            import time
-            time.sleep(1)
-            # Start client
-            subprocess.run([sys.executable, "snake_client_modern.py"])
-            # Cleanup
-            server_process.terminate()
+            subprocess.run([sys.executable, "snake_2players_local.py"])
         except FileNotFoundError:
-            print("❌ Error: Multiplayer files not found!")
+            print("Error: snake_2players_local.py not found!")
     
     def launch_multiplayer_client(self):
         """Launch multiplayer client only"""
-        print("🌐 Launching Multiplayer Client...")
+        print("Launching Multiplayer Client...")
         self.running = False
         try:
-            subprocess.run([sys.executable, "snake_client_modern.py"])
+            subprocess.run([sys.executable, "snake_client.py"])
         except FileNotFoundError:
-            print("❌ Error: snake_client_modern.py not found!")
+            print("Error: snake_client.py not found!")
     
     def quit_game(self):
         """Exit the game"""
-        print("👋 Goodbye!")
+        print("Goodbye!")
         self.running = False
         pygame.quit()
         sys.exit()
@@ -145,14 +140,12 @@ class MainMenu:
         ]
         
         for i, pos in enumerate(snake_segments):
-            alpha = 50 + i * 5
             size = 25 - i
             color = (46 + i * 10, 204 - i * 10, 113 - i * 5)
             pygame.draw.circle(self.screen, color, pos, size)
         
         # Mirror on right side
         for i, pos in enumerate(snake_segments):
-            alpha = 50 + i * 5
             size = 25 - i
             color = (46 + i * 10, 204 - i * 10, 113 - i * 5)
             mirrored_x = SCREEN_WIDTH - pos[0]

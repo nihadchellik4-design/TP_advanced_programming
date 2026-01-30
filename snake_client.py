@@ -112,16 +112,14 @@ class MultiplayerGame:
         )
         pygame.display.set_caption("🐍 Snake Game - Multiplayer")
         
-        # Initialize local player
-        self.my_snake_body = [Vector2(6, 9), Vector2(5, 9), Vector2(4, 9)]
+        # Initialize local player - Server will manage movement
         self.my_direction = [1, 0]
-        self.my_score = 0
         
         # Send join message
         self.network.send({
             'type': 'join',
             'name': player_name,
-            'body': [[int(v.x), int(v.y)] for v in self.my_snake_body],
+            'body': [[6, 9], [5, 9], [4, 9]],
             'direction': self.my_direction
         })
         
@@ -129,6 +127,15 @@ class MultiplayerGame:
         self.score_font = pygame.font.Font(None, 45)
         self.small_font = pygame.font.Font(None, 28)
         self.info_font = pygame.font.Font(None, 32)
+        
+        # Load sounds
+        try:
+            self.eat_sound = pygame.mixer.Sound("snake_eat.wav")
+        except:
+            self.eat_sound = None
+            print("⚠️ Eat sound not found")
+        
+        self.last_score = 0
     
     def handle_input(self):
         """Handle keyboard input for snake direction"""
@@ -150,30 +157,6 @@ class MultiplayerGame:
                 'type': 'direction',
                 'direction': new_direction
             })
-    
-    def update_my_snake(self):
-        """Update local snake position"""
-        new_head = Vector2(
-            self.my_snake_body[0].x + self.my_direction[0],
-            self.my_snake_body[0].y + self.my_direction[1]
-        )
-        
-        # Wrap around edges
-        new_head.x = new_head.x % self.number_of_cells
-        new_head.y = new_head.y % self.number_of_cells
-        
-        self.my_snake_body.insert(0, new_head)
-        self.my_snake_body = self.my_snake_body[:-1]
-        
-        # Send update to server
-        self.network.send({
-            'type': 'update',
-            'player': {
-                'body': [[int(v.x), int(v.y)] for v in self.my_snake_body],
-                'direction': self.my_direction,
-                'score': self.my_score
-            }
-        })
     
     def draw(self):
         """Draw game state with modern design"""
@@ -239,6 +222,13 @@ class MultiplayerGame:
         # Draw all players
         for player_id, player_data in game_state.get('players', {}).items():
             is_me = (player_id == self.network.client_id)
+            
+            # Check if score increased (food eaten)
+            if is_me and self.eat_sound:
+                current_score = player_data.get('score', 0)
+                if current_score > self.last_score:
+                    self.eat_sound.play()
+                self.last_score = current_score
             
             for i, segment in enumerate(player_data['body']):
                 seg_rect = pygame.Rect(
@@ -319,16 +309,10 @@ class MultiplayerGame:
         clock = pygame.time.Clock()
         running = True
         
-        SNAKE_MOVE_EVENT = pygame.USEREVENT + 1
-        pygame.time.set_timer(SNAKE_MOVE_EVENT, 200)
-        
         while running and self.network.connected:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                
-                if event.type == SNAKE_MOVE_EVENT:
-                    self.update_my_snake()
                 
                 if event.type == pygame.KEYDOWN:
                     self.handle_input()
