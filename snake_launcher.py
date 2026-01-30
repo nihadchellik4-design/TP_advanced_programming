@@ -94,7 +94,7 @@ class MainMenu:
         try:
             subprocess.run([sys.executable, "snake_server.py"])
         except FileNotFoundError:
-            print("Error: snake_server.py not found!")
+            print("Error: snake_snake_server.py not found!")
     
     def launch_2players_local(self):
         """Launch 2 players local mode"""
