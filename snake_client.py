@@ -458,5 +458,24 @@ def main():
         print("❌ Could not connect to server")
 
 
+def launch_multiplayer_client():
+    """Lancer le client directement depuis le menu principal"""
+    print("=" * 50)
+    print("🐍 SNAKE GAME - MULTIPLAYER CLIENT")
+    print("=" * 50)
+
+    # Obtenir les infos de connexion
+    server_host, server_port, player_name = get_connection_info()
+
+    # Se connecter au serveur
+    network = NetworkClient(server_host, server_port)
+    if network.connect():
+        # Démarrer le jeu
+        game = MultiplayerGame(network, player_name)
+        game.run()
+    else:
+        print("❌ Impossible de se connecter au serveur")
+        input("Appuyez sur Entrée pour continuer...")
+
 if __name__ == "__main__":
     main()

@@ -84,9 +84,21 @@ class MainMenu:
                    self.launch_multiplayer_client),
             Button(button_x, start_y + spacing * 3, button_width, button_height,
                    "Exit", WARNING_RED, (192, 57, 43),
-                   self.quit_game)
+                   self.quit_game),
+            # multiplayer sur réseau
+            Button(button_x, start_y + spacing * 3, button_width, button_height,
+                   "Multiplayer (Host Server)", ACCENT_BLUE, ACCENT_HOVER,
+                   self.launch_multiplayer_server),
         ]
-        
+#multiplayer sur réseau
+    def launch_multiplayer_server(self):
+        """Lancer le serveur de jeu multijoueur"""
+        print("Launching Multiplayer Server...")
+        self.running = False
+        try:
+            subprocess.run([sys.executable, "snake_multiplayer_server.py"])
+        except FileNotFoundError:
+            print("Error: snake_multiplayer_server.py not found!")
     def launch_premium(self):
         """Launch premium version with levels and color themes"""
         print("Launching Premium Version...")
