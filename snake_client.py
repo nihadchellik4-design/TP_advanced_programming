@@ -21,6 +21,7 @@ UI_BG = (52, 73, 94)
 TEXT_DARK = (44, 62, 80)
 GOLD = (241, 196, 15)
 
+
 # Network Client Class
 class NetworkClient:
     def __init__(self, host, port):
@@ -29,26 +30,28 @@ class NetworkClient:
         self.port = port
         self.client_id = None
         self.game_state = {
-            'players': {}, 
-            'food1': None, 
-            'food2': None, 
+            'players': {},
+            'food1': None,
+            'food2': None,
             'obstacles': []
         }
         self.connected = False
-        
+        self.lock = threading.Lock()
+
     def connect(self):
         """Connect to server"""
         try:
             self.client.connect((self.host, self.port))
             self.connected = True
             print(f"✅ Connected to {self.host}:{self.port}")
-            
+
+            # Start receive thread
             threading.Thread(target=self.receive, daemon=True).start()
             return True
         except Exception as e:
             print(f"❌ Connection failed: {e}")
             return False
-    
+
     def send(self, data):
         """Send data to server"""
         try:
@@ -58,7 +61,7 @@ class NetworkClient:
         except Exception as e:
             print(f"❌ Send error: {e}")
             self.connected = False
-    
+
     def receive(self):
         """Receive data from server"""
         while self.connected:
@@ -66,82 +69,87 @@ class NetworkClient:
                 length_bytes = self.client.recv(4)
                 if not length_bytes:
                     break
-                
+
                 message_length = int.from_bytes(length_bytes, byteorder='big')
-                
+
                 message = b''
                 while len(message) < message_length:
                     chunk = self.client.recv(min(message_length - len(message), 4096))
                     if not chunk:
                         break
                     message += chunk
-                
+
+                if not message:
+                    break
+
                 data = json.loads(message.decode('utf-8'))
                 self.process_message(data)
-                
+
             except Exception as e:
                 print(f"❌ Receive error: {e}")
                 self.connected = False
                 break
-    
+
     def process_message(self, data):
         """Process messages from server"""
         msg_type = data.get('type')
-        
+
         if msg_type == 'connection':
             self.client_id = data['client_id']
             print(f"🆔 Assigned ID: {self.client_id}")
-        
+
         elif msg_type == 'state':
-            self.game_state = data['game_state']
+            with self.lock:
+                self.game_state = data['game_state']
 
 
 class MultiplayerGame:
     def __init__(self, network_client, player_name):
         self.network = network_client
         self.player_name = player_name
-        
+
         pygame.init()
         self.cell_size = 20
         self.number_of_cells = 20
         self.OFFSET = 75
-        
+
         self.screen = pygame.display.set_mode(
-            (2*self.OFFSET + self.cell_size * self.number_of_cells, 
-             2*self.OFFSET + self.cell_size * self.number_of_cells)
+            (2 * self.OFFSET + self.cell_size * self.number_of_cells,
+             2 * self.OFFSET + self.cell_size * self.number_of_cells)
         )
-        pygame.display.set_caption("🐍 Snake Game - Multiplayer")
-        
-        # Initialize local player - Server will manage movement
+        pygame.display.set_caption(f"🐍 Snake Game - Multiplayer ({player_name})")
+
+        # Initialize local direction
         self.my_direction = [1, 0]
-        
-        # Send join message
+
+        # Send join message to server
         self.network.send({
             'type': 'join',
             'name': player_name,
             'body': [[6, 9], [5, 9], [4, 9]],
             'direction': self.my_direction
         })
-        
+
+        # Fonts
         self.title_font = pygame.font.Font(None, 70)
         self.score_font = pygame.font.Font(None, 45)
         self.small_font = pygame.font.Font(None, 28)
         self.info_font = pygame.font.Font(None, 32)
-        
+
         # Load sounds
         try:
             self.eat_sound = pygame.mixer.Sound("snake_eat.wav")
         except:
             self.eat_sound = None
             print("⚠️ Eat sound not found")
-        
+
         self.last_score = 0
-    
+
     def handle_input(self):
         """Handle keyboard input for snake direction"""
         keys = pygame.key.get_pressed()
         new_direction = None
-        
+
         if keys[pygame.K_UP] and self.my_direction != [0, 1]:
             new_direction = [0, -1]
         elif keys[pygame.K_DOWN] and self.my_direction != [0, -1]:
@@ -150,39 +158,41 @@ class MultiplayerGame:
             new_direction = [-1, 0]
         elif keys[pygame.K_RIGHT] and self.my_direction != [-1, 0]:
             new_direction = [1, 0]
-        
+
         if new_direction:
             self.my_direction = new_direction
             self.network.send({
                 'type': 'direction',
                 'direction': new_direction
             })
-    
+
     def draw(self):
         """Draw game state with modern design"""
+        # Get game state safely
+        with self.network.lock:
+            game_state = self.network.game_state.copy()
+
         # Gradient background
-        for y in range(2*self.OFFSET + self.cell_size * self.number_of_cells):
-            ratio = y / (2*self.OFFSET + self.cell_size * self.number_of_cells)
+        for y in range(2 * self.OFFSET + self.cell_size * self.number_of_cells):
+            ratio = y / (2 * self.OFFSET + self.cell_size * self.number_of_cells)
             r = int(46 + (39 - 46) * ratio)
             g = int(204 + (174 - 204) * ratio)
             b = int(113 + (96 - 113) * ratio)
-            pygame.draw.line(self.screen, (r, g, b), (0, y), 
-                           (2*self.OFFSET + self.cell_size * self.number_of_cells, y))
-        
+            pygame.draw.line(self.screen, (r, g, b), (0, y),
+                             (2 * self.OFFSET + self.cell_size * self.number_of_cells, y))
+
         # Game border
-        pygame.draw.rect(self.screen, TEXT_DARK, 
-                        (self.OFFSET-7, self.OFFSET-7, 
-                         self.cell_size*self.number_of_cells+14, 
-                         self.cell_size*self.number_of_cells+14),
-                        border_radius=10)
-        pygame.draw.rect(self.screen, BG_DARK, 
-                        (self.OFFSET-5, self.OFFSET-5, 
-                         self.cell_size*self.number_of_cells+10, 
-                         self.cell_size*self.number_of_cells+10), 
-                        5, border_radius=8)
-        
-        game_state = self.network.game_state
-        
+        pygame.draw.rect(self.screen, TEXT_DARK,
+                         (self.OFFSET - 7, self.OFFSET - 7,
+                          self.cell_size * self.number_of_cells + 14,
+                          self.cell_size * self.number_of_cells + 14),
+                         border_radius=10)
+        pygame.draw.rect(self.screen, BG_DARK,
+                         (self.OFFSET - 5, self.OFFSET - 5,
+                          self.cell_size * self.number_of_cells + 10,
+                          self.cell_size * self.number_of_cells + 10),
+                         5, border_radius=8)
+
         # Draw food
         if game_state.get('food1'):
             food_rect = pygame.Rect(
@@ -191,11 +201,12 @@ class MultiplayerGame:
                 self.cell_size,
                 self.cell_size
             )
+            # Apple with glow
             pygame.draw.circle(self.screen, RED, food_rect.center, self.cell_size // 2)
-            # Highlight
-            pygame.draw.circle(self.screen, WHITE, 
-                             (food_rect.centerx - 3, food_rect.centery - 3), 3)
-        
+            pygame.draw.circle(self.screen, (255, 150, 150), food_rect.center, self.cell_size // 2 - 2)
+            pygame.draw.circle(self.screen, WHITE,
+                               (food_rect.centerx - 3, food_rect.centery - 3), 3)
+
         if game_state.get('food2'):
             food_rect = pygame.Rect(
                 self.OFFSET + game_state['food2'][0] * self.cell_size,
@@ -203,11 +214,12 @@ class MultiplayerGame:
                 self.cell_size,
                 self.cell_size
             )
+            # Mushroom with glow
             pygame.draw.circle(self.screen, ORANGE, food_rect.center, self.cell_size // 2)
-            # Highlight
+            pygame.draw.circle(self.screen, (255, 200, 100), food_rect.center, self.cell_size // 2 - 2)
             pygame.draw.circle(self.screen, WHITE,
-                             (food_rect.centerx - 3, food_rect.centery - 3), 3)
-        
+                               (food_rect.centerx - 3, food_rect.centery - 3), 3)
+
         # Draw obstacles
         for obstacle in game_state.get('obstacles', []):
             obs_rect = pygame.Rect(
@@ -216,110 +228,144 @@ class MultiplayerGame:
                 self.cell_size,
                 self.cell_size
             )
+            # Brick pattern
             pygame.draw.rect(self.screen, BRICK_RED, obs_rect, border_radius=4)
+
+            # Brick details
+            brick_height = self.cell_size // 3
+            brick_width = self.cell_size // 2
+
+            pygame.draw.rect(self.screen, BRICK_DARK,
+                             (obs_rect.x, obs_rect.y, brick_width - 1, brick_height - 1))
+            pygame.draw.rect(self.screen, BRICK_DARK,
+                             (obs_rect.x + brick_width, obs_rect.y, brick_width - 1, brick_height - 1))
+            pygame.draw.rect(self.screen, (205, 97, 85),
+                             (obs_rect.x, obs_rect.y + brick_height, self.cell_size, brick_height - 1))
+
             pygame.draw.rect(self.screen, BRICK_DARK, obs_rect, 2, border_radius=4)
-        
+
         # Draw all players
-        for player_id, player_data in game_state.get('players', {}).items():
-            is_me = (player_id == self.network.client_id)
-            
+        players = game_state.get('players', {})
+        for player_id, player_data in players.items():
+            is_me = (str(player_id) == str(self.network.client_id))
+
             # Check if score increased (food eaten)
             if is_me and self.eat_sound:
                 current_score = player_data.get('score', 0)
                 if current_score > self.last_score:
                     self.eat_sound.play()
                 self.last_score = current_score
-            
+
+            # Draw snake body
             for i, segment in enumerate(player_data['body']):
                 seg_rect = pygame.Rect(
                     self.OFFSET + segment[0] * self.cell_size,
                     self.OFFSET + segment[1] * self.cell_size,
-                    self.cell_size, 
+                    self.cell_size,
                     self.cell_size
                 )
-                
+
                 # Choose color based on player
                 if is_me:
                     color = SNAKE_MY_HEAD if i == 0 else SNAKE_MY_COLOR
                 else:
                     color = SNAKE_OTHER_HEAD if i == 0 else SNAKE_OTHER_COLOR
-                
+
                 pygame.draw.rect(self.screen, color, seg_rect, border_radius=7)
-                
+
                 # Add shine to head
                 if i == 0:
                     shine_rect = pygame.Rect(seg_rect.x + 4, seg_rect.y + 4, 6, 6)
                     pygame.draw.rect(self.screen, WHITE, shine_rect, border_radius=3)
-            
+
             # Draw player name tag
             if player_data.get('name'):
-                head = player_data['body'][0]
+                head = player_data['body'][0] if player_data['body'] else [0, 0]
                 name_text = f"{player_data['name']}"
                 score_text = f"({player_data.get('score', 0)})"
-                
+
                 # Background for name
                 name_surface = self.small_font.render(name_text, True, WHITE)
                 score_surface = self.small_font.render(score_text, True, GOLD)
-                
+
                 name_x = self.OFFSET + head[0] * self.cell_size
                 name_y = self.OFFSET + head[1] * self.cell_size - 25
-                
+
                 # Draw name background
-                bg_rect = pygame.Rect(name_x - 5, name_y - 2, 
-                                     name_surface.get_width() + score_surface.get_width() + 15, 
-                                     name_surface.get_height() + 4)
+                total_width = name_surface.get_width() + score_surface.get_width() + 10
+                bg_rect = pygame.Rect(name_x - 5, name_y - 2,
+                                      total_width,
+                                      name_surface.get_height() + 4)
                 pygame.draw.rect(self.screen, UI_BG, bg_rect, border_radius=4)
-                
+                pygame.draw.rect(self.screen, WHITE, bg_rect, 1, border_radius=4)
+
                 self.screen.blit(name_surface, (name_x, name_y))
                 self.screen.blit(score_surface, (name_x + name_surface.get_width() + 5, name_y))
-        
+
         # Draw UI title
         title_shadow = self.title_font.render("MULTIPLAYER", True, TEXT_DARK)
         title_surface = self.title_font.render("MULTIPLAYER", True, WHITE)
-        self.screen.blit(title_shadow, (self.OFFSET-3, 18))
-        self.screen.blit(title_surface, (self.OFFSET-5, 15))
-        
+        self.screen.blit(title_shadow, (self.OFFSET - 3, 18))
+        self.screen.blit(title_surface, (self.OFFSET - 5, 15))
+
         # Get my score from server
         my_score = 0
-        if self.network.client_id in game_state.get('players', {}):
-            my_score = game_state['players'][self.network.client_id].get('score', 0)
-        
+        if str(self.network.client_id) in players:
+            my_score = players[str(self.network.client_id)].get('score', 0)
+
         # Score display
-        score_bg_rect = pygame.Rect(self.OFFSET-10, 
-                                    self.OFFSET + self.cell_size*self.number_of_cells+5, 
+        score_bg_rect = pygame.Rect(self.OFFSET - 10,
+                                    self.OFFSET + self.cell_size * self.number_of_cells + 5,
                                     220, 50)
         pygame.draw.rect(self.screen, UI_BG, score_bg_rect, border_radius=8)
+        pygame.draw.rect(self.screen, WHITE, score_bg_rect, 2, border_radius=8)
         score_surface = self.score_font.render(f"Score: {my_score}", True, GOLD)
-        self.screen.blit(score_surface, 
-                        (self.OFFSET, self.OFFSET + self.cell_size*self.number_of_cells+15))
-        
+        self.screen.blit(score_surface,
+                         (self.OFFSET, self.OFFSET + self.cell_size * self.number_of_cells + 15))
+
         # Players count
         players_text = self.info_font.render(
-            f"Players: {len(game_state.get('players', {}))}", 
-            True, 
+            f"Players: {len(players)}",
+            True,
             WHITE
         )
-        self.screen.blit(players_text, 
-                        (self.OFFSET + 240, self.OFFSET + self.cell_size*self.number_of_cells+20))
-        
+        self.screen.blit(players_text,
+                         (self.OFFSET + 240, self.OFFSET + self.cell_size * self.number_of_cells + 20))
+
+        # Connection status
+        status_color = (100, 255, 100) if self.network.connected else (255, 100, 100)
+        status_text = self.small_font.render(
+            f"Connected: {self.network.host}:{self.network.port}",
+            True,
+            status_color
+        )
+        self.screen.blit(status_text,
+                         (self.OFFSET + 400, self.OFFSET + self.cell_size * self.number_of_cells + 25))
+
         pygame.display.update()
-    
+
     def run(self):
         """Main game loop"""
         clock = pygame.time.Clock()
         running = True
-        
+
         while running and self.network.connected:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                
+
+                # Handle input on keydown for more responsive controls
                 if event.type == pygame.KEYDOWN:
                     self.handle_input()
-            
+
+            # Also check for continuous key presses
+            keys = pygame.key.get_pressed()
+            if any(keys[pygame.K_UP], keys[pygame.K_DOWN], keys[pygame.K_LEFT], keys[pygame.K_RIGHT]):
+                self.handle_input()
+
             self.draw()
             clock.tick(60)
-        
+
         pygame.quit()
 
 
@@ -328,17 +374,17 @@ def get_connection_info():
     pygame.init()
     screen = pygame.display.set_mode((700, 500))
     pygame.display.set_caption("🌐 Multiplayer Connection")
-    
+
     font = pygame.font.Font(None, 48)
     small_font = pygame.font.Font(None, 32)
-    
+
     server_ip = "localhost"
     server_port = "5555"
     player_name = ""
     active_field = "ip"
-    
+
     clock = pygame.time.Clock()
-    
+
     while True:
         # Gradient background
         for y in range(500):
@@ -347,59 +393,59 @@ def get_connection_info():
             g = int(152 + (62 - 152) * ratio)
             b = int(219 + (80 - 219) * ratio)
             pygame.draw.line(screen, (r, g, b), (0, y), (700, y))
-        
+
         # Title
         title = font.render("🌐 MULTIPLAYER", True, WHITE)
         title_rect = title.get_rect(center=(350, 50))
         screen.blit(title, title_rect)
-        
+
         subtitle = small_font.render("Enter Connection Info", True, (189, 195, 199))
         subtitle_rect = subtitle.get_rect(center=(350, 100))
         screen.blit(subtitle, subtitle_rect)
-        
+
         # Server IP field
         ip_label = small_font.render("Server IP:", True, WHITE)
         screen.blit(ip_label, (100, 150))
-        
+
         ip_color = WHITE if active_field == "ip" else (149, 165, 166)
         pygame.draw.rect(screen, UI_BG, (100, 180, 500, 45), border_radius=8)
         pygame.draw.rect(screen, ip_color, (100, 180, 500, 45), 3, border_radius=8)
         ip_text = small_font.render(server_ip, True, WHITE)
         screen.blit(ip_text, (115, 192))
-        
+
         # Server Port field
         port_label = small_font.render("Server Port:", True, WHITE)
         screen.blit(port_label, (100, 250))
-        
+
         port_color = WHITE if active_field == "port" else (149, 165, 166)
         pygame.draw.rect(screen, UI_BG, (100, 280, 500, 45), border_radius=8)
         pygame.draw.rect(screen, port_color, (100, 280, 500, 45), 3, border_radius=8)
         port_text = small_font.render(server_port, True, WHITE)
         screen.blit(port_text, (115, 292))
-        
+
         # Player Name field
         name_label = small_font.render("Your Name:", True, WHITE)
         screen.blit(name_label, (100, 350))
-        
+
         name_color = WHITE if active_field == "name" else (149, 165, 166)
         pygame.draw.rect(screen, UI_BG, (100, 380, 500, 45), border_radius=8)
         pygame.draw.rect(screen, name_color, (100, 380, 500, 45), 3, border_radius=8)
         name_text = small_font.render(player_name, True, WHITE)
         screen.blit(name_text, (115, 392))
-        
+
         # Instructions
         inst_font = pygame.font.Font(None, 24)
         inst_text = inst_font.render("Press ENTER to Connect | TAB to switch", True, (189, 195, 199))
         screen.blit(inst_text, (160, 450))
-        
+
         pygame.display.update()
-        
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 import sys
                 sys.exit()
-            
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
                 if 100 <= mouse_pos[0] <= 600:
@@ -409,7 +455,7 @@ def get_connection_info():
                         active_field = "port"
                     elif 380 <= mouse_pos[1] <= 425:
                         active_field = "name"
-            
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
                     if server_ip and server_port and player_name:
@@ -436,7 +482,7 @@ def get_connection_info():
                         server_port += event.unicode
                     elif active_field == "name" and len(player_name) < 20:
                         player_name += event.unicode
-        
+
         clock.tick(30)
 
 
@@ -444,10 +490,15 @@ def main():
     print("=" * 50)
     print("🐍 SNAKE GAME - MULTIPLAYER CLIENT")
     print("=" * 50)
-    
+    print("\nInstructions:")
+    print("1. Someone must run 'Multiplayer Host (Server)' first")
+    print("2. Get the server IP (Hamachi IP if playing online)")
+    print("3. Enter that IP here")
+    print("=" * 50)
+
     # Get connection info
     server_host, server_port, player_name = get_connection_info()
-    
+
     # Connect to server
     network = NetworkClient(server_host, server_port)
     if network.connect():
@@ -456,26 +507,18 @@ def main():
         game.run()
     else:
         print("❌ Could not connect to server")
+        print("Make sure:")
+        print("1. Server is running")
+        print("2. IP address is correct")
+        print("3. Port 5555 is open")
+        print("4. Firewall allows connections")
+        input("Press Enter to continue...")
 
 
 def launch_multiplayer_client():
     """Lancer le client directement depuis le menu principal"""
-    print("=" * 50)
-    print("🐍 SNAKE GAME - MULTIPLAYER CLIENT")
-    print("=" * 50)
+    main()
 
-    # Obtenir les infos de connexion
-    server_host, server_port, player_name = get_connection_info()
-
-    # Se connecter au serveur
-    network = NetworkClient(server_host, server_port)
-    if network.connect():
-        # Démarrer le jeu
-        game = MultiplayerGame(network, player_name)
-        game.run()
-    else:
-        print("❌ Impossible de se connecter au serveur")
-        input("Appuyez sur Entrée pour continuer...")
 
 if __name__ == "__main__":
     main()
