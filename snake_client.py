@@ -1,3 +1,4 @@
+# snake_client.py - VERSION CORRIGÉE
 import socket
 import threading
 import json
@@ -45,7 +46,14 @@ class NetworkClient:
             self.connected = True
             print(f"✅ Connected to {self.host}:{self.port}")
 
-            # Start receive thread
+            # Recevoir le welcome immédiatement
+            data = self.client.recv(4096)
+            if data:
+                welcome = json.loads(data.decode('utf-8'))
+                self.client_id = welcome.get('client_id')
+                print(f"🆔 Assigned ID: {self.client_id}")
+
+            # Démarrer thread de réception
             threading.Thread(target=self.receive, daemon=True).start()
             return True
         except Exception as e:
@@ -56,8 +64,7 @@ class NetworkClient:
         """Send data to server"""
         try:
             message = json.dumps(data).encode('utf-8')
-            message_length = len(message).to_bytes(4, byteorder='big')
-            self.client.sendall(message_length + message)
+            self.client.send(message)  # Pas de message_length pour compatibilité
         except Exception as e:
             print(f"❌ Send error: {e}")
             self.connected = False
@@ -66,25 +73,18 @@ class NetworkClient:
         """Receive data from server"""
         while self.connected:
             try:
-                length_bytes = self.client.recv(4)
-                if not length_bytes:
-                    break
+                self.client.settimeout(0.1)
+                data = self.client.recv(4096)
 
-                message_length = int.from_bytes(length_bytes, byteorder='big')
+                if data:
+                    try:
+                        data_json = json.loads(data.decode('utf-8'))
+                        self.process_message(data_json)
+                    except json.JSONDecodeError:
+                        print(f"❌ Invalid JSON received: {data[:100]}")
 
-                message = b''
-                while len(message) < message_length:
-                    chunk = self.client.recv(min(message_length - len(message), 4096))
-                    if not chunk:
-                        break
-                    message += chunk
-
-                if not message:
-                    break
-
-                data = json.loads(message.decode('utf-8'))
-                self.process_message(data)
-
+            except socket.timeout:
+                continue
             except Exception as e:
                 print(f"❌ Receive error: {e}")
                 self.connected = False
@@ -94,11 +94,7 @@ class NetworkClient:
         """Process messages from server"""
         msg_type = data.get('type')
 
-        if msg_type == 'connection':
-            self.client_id = data['client_id']
-            print(f"🆔 Assigned ID: {self.client_id}")
-
-        elif msg_type == 'state':
+        if msg_type == 'state':
             with self.lock:
                 self.game_state = data['game_state']
 
@@ -117,12 +113,13 @@ class MultiplayerGame:
             (2 * self.OFFSET + self.cell_size * self.number_of_cells,
              2 * self.OFFSET + self.cell_size * self.number_of_cells)
         )
-        pygame.display.set_caption(f"🐍 Snake Game - Multiplayer ({player_name})")
+        pygame.display.set_caption("🐍 Snake Game - Multiplayer")
 
-        # Initialize local direction
+        # Initialiser la direction
         self.my_direction = [1, 0]
+        self.last_direction = [1, 0]
 
-        # Send join message to server
+        # Envoyer le message join
         self.network.send({
             'type': 'join',
             'name': player_name,
@@ -150,17 +147,18 @@ class MultiplayerGame:
         keys = pygame.key.get_pressed()
         new_direction = None
 
-        if keys[pygame.K_UP] and self.my_direction != [0, 1]:
+        if keys[pygame.K_UP] and self.last_direction != [0, 1]:
             new_direction = [0, -1]
-        elif keys[pygame.K_DOWN] and self.my_direction != [0, -1]:
+        elif keys[pygame.K_DOWN] and self.last_direction != [0, -1]:
             new_direction = [0, 1]
-        elif keys[pygame.K_LEFT] and self.my_direction != [1, 0]:
+        elif keys[pygame.K_LEFT] and self.last_direction != [1, 0]:
             new_direction = [-1, 0]
-        elif keys[pygame.K_RIGHT] and self.my_direction != [-1, 0]:
+        elif keys[pygame.K_RIGHT] and self.last_direction != [-1, 0]:
             new_direction = [1, 0]
 
         if new_direction:
             self.my_direction = new_direction
+            self.last_direction = new_direction
             self.network.send({
                 'type': 'direction',
                 'direction': new_direction
@@ -201,9 +199,7 @@ class MultiplayerGame:
                 self.cell_size,
                 self.cell_size
             )
-            # Apple with glow
             pygame.draw.circle(self.screen, RED, food_rect.center, self.cell_size // 2)
-            pygame.draw.circle(self.screen, (255, 150, 150), food_rect.center, self.cell_size // 2 - 2)
             pygame.draw.circle(self.screen, WHITE,
                                (food_rect.centerx - 3, food_rect.centery - 3), 3)
 
@@ -214,9 +210,7 @@ class MultiplayerGame:
                 self.cell_size,
                 self.cell_size
             )
-            # Mushroom with glow
             pygame.draw.circle(self.screen, ORANGE, food_rect.center, self.cell_size // 2)
-            pygame.draw.circle(self.screen, (255, 200, 100), food_rect.center, self.cell_size // 2 - 2)
             pygame.draw.circle(self.screen, WHITE,
                                (food_rect.centerx - 3, food_rect.centery - 3), 3)
 
@@ -228,24 +222,12 @@ class MultiplayerGame:
                 self.cell_size,
                 self.cell_size
             )
-            # Brick pattern
             pygame.draw.rect(self.screen, BRICK_RED, obs_rect, border_radius=4)
-
-            # Brick details
-            brick_height = self.cell_size // 3
-            brick_width = self.cell_size // 2
-
-            pygame.draw.rect(self.screen, BRICK_DARK,
-                             (obs_rect.x, obs_rect.y, brick_width - 1, brick_height - 1))
-            pygame.draw.rect(self.screen, BRICK_DARK,
-                             (obs_rect.x + brick_width, obs_rect.y, brick_width - 1, brick_height - 1))
-            pygame.draw.rect(self.screen, (205, 97, 85),
-                             (obs_rect.x, obs_rect.y + brick_height, self.cell_size, brick_height - 1))
-
             pygame.draw.rect(self.screen, BRICK_DARK, obs_rect, 2, border_radius=4)
 
         # Draw all players
         players = game_state.get('players', {})
+
         for player_id, player_data in players.items():
             is_me = (str(player_id) == str(self.network.client_id))
 
@@ -257,7 +239,8 @@ class MultiplayerGame:
                 self.last_score = current_score
 
             # Draw snake body
-            for i, segment in enumerate(player_data['body']):
+            body = player_data.get('body', [])
+            for i, segment in enumerate(body):
                 seg_rect = pygame.Rect(
                     self.OFFSET + segment[0] * self.cell_size,
                     self.OFFSET + segment[1] * self.cell_size,
@@ -279,8 +262,8 @@ class MultiplayerGame:
                     pygame.draw.rect(self.screen, WHITE, shine_rect, border_radius=3)
 
             # Draw player name tag
-            if player_data.get('name'):
-                head = player_data['body'][0] if player_data['body'] else [0, 0]
+            if player_data.get('name') and body:
+                head = body[0]
                 name_text = f"{player_data['name']}"
                 score_text = f"({player_data.get('score', 0)})"
 
@@ -335,7 +318,7 @@ class MultiplayerGame:
         # Connection status
         status_color = (100, 255, 100) if self.network.connected else (255, 100, 100)
         status_text = self.small_font.render(
-            f"Connected: {self.network.host}:{self.network.port}",
+            f"Connected to: {self.network.host}",
             True,
             status_color
         )
@@ -354,14 +337,8 @@ class MultiplayerGame:
                 if event.type == pygame.QUIT:
                     running = False
 
-                # Handle input on keydown for more responsive controls
                 if event.type == pygame.KEYDOWN:
                     self.handle_input()
-
-            # Also check for continuous key presses
-            keys = pygame.key.get_pressed()
-            if any(keys[pygame.K_UP], keys[pygame.K_DOWN], keys[pygame.K_LEFT], keys[pygame.K_RIGHT]):
-                self.handle_input()
 
             self.draw()
             clock.tick(60)
@@ -378,10 +355,10 @@ def get_connection_info():
     font = pygame.font.Font(None, 48)
     small_font = pygame.font.Font(None, 32)
 
-    server_ip = "localhost"
+    server_ip = "25.40.67.39"  # Pré-rempli avec votre IP Hamachi
     server_port = "5555"
     player_name = ""
-    active_field = "ip"
+    active_field = "name"  # Commence avec le nom
 
     clock = pygame.time.Clock()
 
@@ -403,13 +380,12 @@ def get_connection_info():
         subtitle_rect = subtitle.get_rect(center=(350, 100))
         screen.blit(subtitle, subtitle_rect)
 
-        # Server IP field
-        ip_label = small_font.render("Server IP:", True, WHITE)
+        # Server IP field (non éditable)
+        ip_label = small_font.render("Server IP (Hamachi):", True, WHITE)
         screen.blit(ip_label, (100, 150))
 
-        ip_color = WHITE if active_field == "ip" else (149, 165, 166)
         pygame.draw.rect(screen, UI_BG, (100, 180, 500, 45), border_radius=8)
-        pygame.draw.rect(screen, ip_color, (100, 180, 500, 45), 3, border_radius=8)
+        pygame.draw.rect(screen, (100, 150, 200), (100, 180, 500, 45), 3, border_radius=8)
         ip_text = small_font.render(server_ip, True, WHITE)
         screen.blit(ip_text, (115, 192))
 
@@ -449,9 +425,7 @@ def get_connection_info():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
                 if 100 <= mouse_pos[0] <= 600:
-                    if 180 <= mouse_pos[1] <= 225:
-                        active_field = "ip"
-                    elif 280 <= mouse_pos[1] <= 325:
+                    if 280 <= mouse_pos[1] <= 325:
                         active_field = "port"
                     elif 380 <= mouse_pos[1] <= 425:
                         active_field = "name"
@@ -462,23 +436,17 @@ def get_connection_info():
                         pygame.quit()
                         return server_ip, int(server_port), player_name
                 elif event.key == pygame.K_TAB:
-                    if active_field == "ip":
-                        active_field = "port"
-                    elif active_field == "port":
+                    if active_field == "port":
                         active_field = "name"
-                    else:
-                        active_field = "ip"
+                    elif active_field == "name":
+                        active_field = "port"
                 elif event.key == pygame.K_BACKSPACE:
-                    if active_field == "ip":
-                        server_ip = server_ip[:-1]
-                    elif active_field == "port":
+                    if active_field == "port":
                         server_port = server_port[:-1]
-                    else:
+                    elif active_field == "name":
                         player_name = player_name[:-1]
                 else:
-                    if active_field == "ip" and len(server_ip) < 30:
-                        server_ip += event.unicode
-                    elif active_field == "port" and len(server_port) < 10 and event.unicode.isdigit():
+                    if active_field == "port" and len(server_port) < 10 and event.unicode.isdigit():
                         server_port += event.unicode
                     elif active_field == "name" and len(player_name) < 20:
                         player_name += event.unicode
@@ -491,9 +459,9 @@ def main():
     print("🐍 SNAKE GAME - MULTIPLAYER CLIENT")
     print("=" * 50)
     print("\nInstructions:")
-    print("1. Someone must run 'Multiplayer Host (Server)' first")
-    print("2. Get the server IP (Hamachi IP if playing online)")
-    print("3. Enter that IP here")
+    print("1. Server must run 'Multiplayer Host (Server)' first")
+    print(f"2. Server IP: 25.40.67.39 (your Hamachi IP)")
+    print("3. Port: 5555")
     print("=" * 50)
 
     # Get connection info
@@ -507,11 +475,6 @@ def main():
         game.run()
     else:
         print("❌ Could not connect to server")
-        print("Make sure:")
-        print("1. Server is running")
-        print("2. IP address is correct")
-        print("3. Port 5555 is open")
-        print("4. Firewall allows connections")
         input("Press Enter to continue...")
 
 

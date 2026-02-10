@@ -1,3 +1,4 @@
+# snake_launcher.py - VERSION CORRIGÉE
 import sys
 import pygame
 import subprocess
@@ -67,11 +68,11 @@ class MainMenu:
         self.button_font = pygame.font.Font(None, 42)
         self.small_font = pygame.font.Font(None, 28)
 
-        # Create buttons
+        # Create buttons - AJOUT DU BOUTON SINGLE PLAYER
         button_width = 450
         button_height = 70
         button_x = (SCREEN_WIDTH - button_width) // 2
-        start_y = 160
+        start_y = 150
         spacing = 80
 
         self.buttons = [
@@ -100,6 +101,7 @@ class MainMenu:
                    self.quit_game),
         ]
 
+    # AJOUTER CETTE MÉTHODE MANQUANTE
     def launch_single_player(self):
         """Launch single player mode"""
         print("Launching Single Player Mode...")
@@ -135,9 +137,9 @@ class MainMenu:
         print("Launching Multiplayer Server...")
         self.running = False
         try:
-            subprocess.run([sys.executable, "snake_multiplayer_server.py"])
+            subprocess.run([sys.executable, "hamachi_server.py"])  # Utiliser hamachi_server.py
         except FileNotFoundError:
-            print("Error: snake_multiplayer_server.py not found!")
+            print("Error: hamachi_server.py not found!")
             self.running = True
 
     def launch_multiplayer_client(self):
@@ -160,7 +162,6 @@ class MainMenu:
     def draw_gradient_background(self):
         """Draw a gradient background"""
         for y in range(SCREEN_HEIGHT):
-            # Calculate color gradient from dark to slightly lighter
             ratio = y / SCREEN_HEIGHT
             r = int(20 + (30 - 20) * ratio)
             g = int(25 + (35 - 25) * ratio)
@@ -190,16 +191,16 @@ class MainMenu:
     def draw_instructions(self):
         """Draw instructions at the bottom"""
         instructions = [
-            "HOW TO PLAY:",
-            "Single Player: Arrow keys to move",
-            "Local Multiplayer: Player 1 (Arrow keys), Player 2 (WASD)",
-            "Network Multiplayer: One player hosts, others join with IP",
-            "Hamachi: Use Hamachi IP (25.x.x.x) to play over internet"
+            "🐍 SNAKE GAME - 3 MODES AVAILABLE",
+            "Single Player: Classic snake game with score saving",
+            "Local Multiplayer: 2 players on same PC (Arrows vs WASD)",
+            "Network Multiplayer: Play with friends over Hamachi",
+            "Server IP for Hamachi: 25.40.67.39"
         ]
 
         y_pos = SCREEN_HEIGHT - 150
         for i, instruction in enumerate(instructions):
-            color = TEXT_COLOR if i == 0 else SUBTITLE_COLOR
+            color = (100, 255, 150) if i == 0 else SUBTITLE_COLOR
             font = self.button_font if i == 0 else self.small_font
             text = font.render(instruction, True, color)
             text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, y_pos + i * 25))
