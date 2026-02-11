@@ -1691,8 +1691,7 @@ while running:
     # Si la boucle s'exécute plus vite, attend pour maintenir 60 FPS
 
 
-# ====================================================================
-# FIN DES COMMENTAIRES DÉTAILLÉS
+
 # ====================================================================
 #
 # RÉSUMÉ DU FONCTIONNEMENT:
