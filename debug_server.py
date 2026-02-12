@@ -1,13 +1,29 @@
-# debug_server.py
-import socket
-import threading
-import json
-import time
-import traceback
+# Ce fichier est un SERVEUR DE DÉBOGAGE ultra-verbose.
+# Rôle : Tester la communication client-serveur en détail
+# Affiche TOUT ce qui se passe (connexions, messages, erreurs)
+# Utilisé pendant le développement pour identifier les bugs
+
+import socket  # Sockets TCP/IP
+import threading  # Threads pour clients multiples
+import json  # Encodage/décodage JSON
+import time  # Horodatage
+import traceback  # Affichage détaillé des erreurs
 
 
 class DebugServer:
+    """
+    CLASSE SERVEUR DE DÉBOGAGE
+    Version ultra-détaillée du serveur qui affiche :
+    - Chaque connexion/déconnexion
+    - Chaque message reçu (brut et décodé)
+    - Chaque envoi de données
+    - Les erreurs avec pile d'appels complète
+    """
+
     def __init__(self, host='0.0.0.0', port=5555):
+        """
+        Constructeur : identique au serveur normal
+        """
         self.host = host
         self.port = port
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -15,29 +31,29 @@ class DebugServer:
 
         self.clients = {}
 
-        print("=" * 60)
-        print("🐍 DEBUG SERVEUR - Version ultra verbose")
-        print("=" * 60)
+        print("🐍 DEBUG SERVEUR ")
 
     def start(self):
+        """
+        MÉTHODE : Démarre le serveur de débogage
+        Affiche chaque étape en détail
+        """
         try:
             self.server.bind((self.host, self.port))
             self.server.listen(5)
 
             print(f"✅ Serveur démarré sur {self.host}:{self.port}")
             print(f"📡 IP Hamachi: 25.40.67.39")
-            print("=" * 60)
             print("👥 En attente de joueurs...")
 
             while True:
+                # Attente de connexion
                 conn, addr = self.server.accept()
-                print(f"\n" + "=" * 60)
                 print(f"✅ NOUVELLE CONNEXION: {addr[0]}:{addr[1]}")
-                print("=" * 60)
 
                 client_id = len(self.clients)
 
-                # Enregistrer le client
+                # Enregistrement du client
                 self.clients[client_id] = {
                     'conn': conn,
                     'addr': addr,
@@ -45,16 +61,20 @@ class DebugServer:
                     'connected_at': time.time()
                 }
 
-                # Thread pour ce client
+                # Thread dédié avec affichage DEBUG
                 thread = threading.Thread(target=self.handle_client_debug, args=(client_id,))
                 thread.daemon = True
                 thread.start()
 
         except Exception as e:
             print(f"❌ ERREUR SERVEUR: {e}")
-            traceback.print_exc()
+            traceback.print_exc()  # Affiche la pile d'appels complète
 
     def handle_client_debug(self, client_id):
+        """
+        MÉTHODE : Version DEBUG du gestionnaire client
+        Affiche ABSOLUMENT TOUT ce qui se passe
+        """
         client = self.clients[client_id]
         conn = client['conn']
         addr = client['addr']
@@ -62,7 +82,7 @@ class DebugServer:
         print(f"[DEBUG] Début handle_client pour {addr}")
 
         try:
-            # Étape 1: Envoyer le message de bienvenue
+            # === ÉTAPE 1 : ENVOI DU WELCOME ===
             welcome_msg = json.dumps({
                 'type': 'welcome',
                 'client_id': client_id,
@@ -74,7 +94,7 @@ class DebugServer:
             conn.send(welcome_msg)
             print(f"[DEBUG] Welcome envoyé à {addr}")
 
-            # Étape 2: Attendre le message 'join' du client
+            # === ÉTAPE 2 : ATTENTE DU 'join' ===
             print(f"[DEBUG] Attente message 'join' de {addr}...")
             conn.settimeout(5.0)  # Timeout de 5 secondes
 
@@ -83,9 +103,11 @@ class DebugServer:
                 print(f"[DEBUG] Reçu {len(data)} bytes de {addr}")
 
                 if data:
+                    # Affiche les données brutes pour analyse
                     print(f"[DEBUG] Données brutes: {data[:100]}...")
 
                     try:
+                        # Tentative de décodage JSON
                         message = json.loads(data.decode())
                         print(f"[DEBUG] Message JSON décodé: {message}")
 
@@ -94,7 +116,7 @@ class DebugServer:
                             client['name'] = name
                             print(f"🎮 {name} a rejoint avec succès!")
 
-                            # Envoyer un état de jeu simple
+                            # === ENVOI D'UN ÉTAT DE JEU SIMPLE ===
                             game_state = {
                                 'type': 'state',
                                 'game_state': {
@@ -117,7 +139,7 @@ class DebugServer:
                             conn.send(state_msg)
                             print(f"[DEBUG] State envoyé à {name}")
 
-                            # Maintenant attendre les commandes de direction
+                            # === ÉTAPE 3 : BOUCLE DE RÉCEPTION DES DIRECTIONS ===
                             print(f"[DEBUG] Attente commandes de {name}...")
                             conn.settimeout(None)  # Pas de timeout
 
@@ -136,7 +158,7 @@ class DebugServer:
 
                                     if msg.get('type') == 'direction':
                                         print(f"[DEBUG] {name}: Direction: {msg['direction']}")
-                                        # Simuler un retour
+                                        # Simule un accusé de réception
                                         response = json.dumps({
                                             'type': 'ack',
                                             'message': 'Direction reçue',
@@ -171,14 +193,11 @@ class DebugServer:
             traceback.print_exc()
 
         finally:
-            # Nettoyage
+            # === NETTOYAGE ===
             duration = time.time() - client.get('connected_at', time.time())
-            print(f"\n" + "=" * 60)
             print(f"👋 {client.get('name', 'Inconnu')} a quitté")
             print(f"⏱️  Durée de connexion: {duration:.2f} secondes")
             print(f"📡 Adresse: {addr}")
-            print("=" * 60)
-
             try:
                 conn.close()
             except:

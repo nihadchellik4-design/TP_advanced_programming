@@ -1,4 +1,4 @@
-# snake_launcher.py - VERSION CORRIGÉE
+# snake_launcher.py
 import sys
 import pygame
 import subprocess
@@ -101,7 +101,6 @@ class MainMenu:
                    self.quit_game),
         ]
 
-    # AJOUTER CETTE MÉTHODE MANQUANTE
     def launch_single_player(self):
         """Launch single player mode"""
         print("Launching Single Player Mode...")
