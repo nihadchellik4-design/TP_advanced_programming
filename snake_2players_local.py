@@ -1,6 +1,3 @@
-# ====================================================================
-# JEU SNAKE MULTIJOUEUR LOCAL (2 JOUEURS)
-# ====================================================================
 # Ce fichier implémente une version multijoueur locale du jeu Snake avec:
 # - 2 joueurs sur le même écran
 # - Chaque joueur choisit la couleur de son serpent
@@ -9,7 +6,6 @@
 # - Deux types de nourriture (pomme 10pts, champignon 15pts)
 # - Contrôles indépendants: Joueur 1 (flèches), Joueur 2 (WASD)
 # - Système de score individuel avec réinitialisation en cas de collision
-# ====================================================================
 
 # Module système : fournit des fonctions pour interagir avec l'interpréteur.
 # Utilisé ici pour sys.exit() qui permet de quitter proprement le programme.
@@ -39,13 +35,12 @@ import os
 # Doit être appelé avant toute autre fonction Pygame.
 pygame.init()
 
-# ====================================================================
+
 # PALETTE DE COULEURS POUR LES DEUX SERPENTS
 # Dictionnaire contenant 8 couleurs différentes pour personnaliser les serpents.
 # Chaque serpent peut choisir indépendamment sa couleur parmi ces options.
 # Structure : clé -> dictionnaire avec 'name' (nom affiché), 'body' (couleur RVB du corps),
 #            'head' (couleur RVB de la tête, souvent plus claire).
-# ====================================================================
 SNAKE_COLORS = {
     # Teal : vert-bleu turquoise
     'teal': {'name': 'Teal', 'body': (22, 160, 133), 'head': (26, 188, 156)},
@@ -65,11 +60,9 @@ SNAKE_COLORS = {
     'yellow': {'name': 'Yellow', 'body': (241, 196, 15), 'head': (255, 230, 100)}
 }
 
-# ====================================================================
 # COULEURS FIXES POUR L'INTERFACE ET LE DÉCOR
 # Ces couleurs sont utilisées pour le fond, le texte, les bordures, etc.
 # Elles sont définies en format RVB (Rouge, Vert, Bleu) de 0 à 255.
-# ====================================================================
 # Vert clair – couleur de départ du dégradé d'arrière-plan
 BG_LIGHT = (46, 204, 113)
 # Vert foncé – couleur de fin du dégradé d'arrière-plan
@@ -89,18 +82,14 @@ TEXT_DARK = (44, 62, 80)
 # Fond des éléments d'interface (ex: zones de score) – gris bleuté
 UI_BG = (52, 73, 94)
 
-# ====================================================================
 # POLICES DE CARACTÈRES
 # pygame.font.Font(None, taille) utilise la police par défaut du système.
-# ====================================================================
 title_font = pygame.font.Font(None, 60)   # Police pour les gros titres (60px)
 score_font = pygame.font.Font(None, 40)   # Police pour l'affichage des scores (40px)
 info_font = pygame.font.Font(None, 28)    # Police pour les informations secondaires (28px)
 
-# ====================================================================
 # PARAMÈTRES DE LA GRILLE DE JEU
 # Le terrain est divisé en cellules carrées de taille fixe.
-# ====================================================================
 # Taille en pixels d'une cellule (carré de 20x20 pixels)
 cell_size = 20
 # Nombre de cellules dans chaque dimension (largeur et hauteur)
@@ -110,20 +99,16 @@ number_of_cells = 20
 # Cette marge permet d'afficher le titre, les scores et les bordures sans chevaucher le jeu.
 OFFSET = 75
 
-# ====================================================================
 # NIVEAUX DE DIFFICULTÉ (version simplifiée pour deux joueurs)
 # Dictionnaire définissant 3 niveaux avec leurs paramètres.
-# ====================================================================
 LEVELS = {
     1: {'name': 'Easy', 'speed': 200, 'obstacles': 5},   # Niveau 1 : facile, vitesse lente, 5 obstacles
     2: {'name': 'Medium', 'speed': 150, 'obstacles': 8}, # Niveau 2 : moyen, vitesse moyenne, 8 obstacles
     3: {'name': 'Hard', 'speed': 100, 'obstacles': 12}   # Niveau 3 : difficile, vitesse rapide, 12 obstacles
 }
 
-# ====================================================================
 # TYPES DE NOURRITURE
 # Dictionnaire définissant les caractéristiques des aliments disponibles.
-# ====================================================================
 FOOD_TYPES = {
     # Pomme : rapporte 10 points, fichier image 'snake_food.png'
     'apple': {'image': 'snake_food.png', 'points': 10},
@@ -132,12 +117,10 @@ FOOD_TYPES = {
 }
 
 
-# ====================================================================
 # CLASSE Food
 # Représente la nourriture que les serpents peuvent manger.
 # Gère le chargement de l'image, le placement aléatoire sur la grille,
 # et l'affichage.
-# ====================================================================
 class Food:
     def __init__(self, snake_bodies, obstacles_positions=None, food_type=None, existing_food_positions=None):
         """
@@ -264,11 +247,9 @@ class Food:
         return FOOD_TYPES[self.food_type]['points']
 
 
-# ====================================================================
 # CLASSE Obstacle
 # Représente un mur sur la grille.
 # Le serpent meurt instantanément s'il entre en collision avec un obstacle.
-# ====================================================================
 class Obstacle:
     def __init__(self, position):
         """
@@ -331,11 +312,9 @@ class Obstacle:
             pygame.draw.rect(screen, BRICK_DARK, obstacle_rect, 2, border_radius=4)
 
 
-# ====================================================================
 # CLASSE Snake
 # Représente un serpent contrôlé par un joueur.
 # Gère le mouvement, la croissance, l'affichage et les collisions.
-# ====================================================================
 class Snake:
     def __init__(self, start_pos, color_key, player_name):
         """
@@ -491,11 +470,9 @@ class Snake:
         return self.snake_body[0] in other_snake.snake_body
 
 
-# ====================================================================
 # CLASSE TwoPlayerGame
 # Classe principale qui gère toute la logique du jeu pour deux joueurs.
 # Coordonne les serpents, la nourriture, les obstacles, les scores.
-# ====================================================================
 class TwoPlayerGame:
     def __init__(self, player1_name, player2_name, p1_color, p2_color, level):
         """
@@ -682,12 +659,10 @@ class TwoPlayerGame:
             print(f"{self.player2_name} died! Score reset.")
 
 
-# ====================================================================
 # FONCTION select_level()
 # Écran de sélection du niveau de difficulté.
 # Affiche trois cartes interactives (Easy, Medium, Hard).
 # Retourne le niveau choisi (1, 2 ou 3).
-# ====================================================================
 def select_level():
     """Écran de sélection du niveau."""
     # Crée une fenêtre de 800x600 pixels pour cette interface
@@ -784,15 +759,12 @@ def select_level():
 
         clock.tick(60)  # Limite à 60 images par seconde
 
-
-# ====================================================================
 # FONCTION select_colors()
 # Écran de sélection des couleurs pour les deux serpents.
 # Permet à chaque joueur de choisir indépendamment sa couleur.
 # Navigation : flèches pour se déplacer, TAB pour changer de joueur,
 # ENTER pour valider les deux choix.
 # Retourne un tuple (clé_couleur_j1, clé_couleur_j2).
-# ====================================================================
 def select_colors():
     """Écran de sélection des couleurs pour les deux joueurs."""
     # Fenêtre de 900x700 pixels
@@ -921,13 +893,11 @@ def select_colors():
         clock.tick(60)
 
 
-# ====================================================================
 # FONCTION get_player_names()
 # Écran de saisie des noms des deux joueurs.
 # Affiche deux champs de texte avec curseur clignotant.
 # Navigation : TAB ou clic souris pour changer de champ, ENTER pour valider.
 # Retourne un tuple (nom_joueur1, nom_joueur2).
-# ====================================================================
 def get_player_names():
     """Écran de saisie des noms des deux joueurs."""
     # Fenêtre de 700x450 pixels
@@ -1028,9 +998,7 @@ def get_player_names():
         clock.tick(30)  # 30 FPS pour cette interface
 
 
-# ====================================================================
 # DÉROULEMENT PRINCIPAL DU JEU
-# ====================================================================
 
 # Étape 1 : Saisie des noms des deux joueurs
 player1_name, player2_name = get_player_names()
@@ -1063,9 +1031,7 @@ SNAKE_MOVE_EVENT = pygame.USEREVENT + 1
 # La vitesse est définie par le niveau choisi
 pygame.time.set_timer(SNAKE_MOVE_EVENT, LEVELS[level]['speed'])
 
-# ====================================================================
 # BOUCLE PRINCIPALE
-# ====================================================================
 while running:
     # --- Gestion des événements ---
     for event in pygame.event.get():
@@ -1160,8 +1126,3 @@ while running:
     pygame.display.update()
     # Limite le taux de rafraîchissement à 60 images par seconde
     clock.tick(60)
-
-
-# ====================================================================
-# FIN DU PROGRAMME
-# ====================================================================

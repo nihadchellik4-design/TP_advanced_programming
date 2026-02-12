@@ -1,11 +1,9 @@
-# ====================================================================
 # Ce fichier implémente une version premium du jeu Snake avec:
 # - Plusieurs thèmes de couleurs
 # - Différents niveaux de difficulté
 # - Effets de particules
 # - Animations avancées
 # - Sauvegarde des scores
-# ====================================================================
 # Module système pour gérer la sortie du programme (sys.exit())
 import sys
 # Module pour générer des nombres aléatoires (positions de la nourriture, obstacles, etc.)
@@ -1691,9 +1689,6 @@ while running:
     # Si la boucle s'exécute plus vite, attend pour maintenir 60 FPS
 
 
-
-# ====================================================================
-#
 # RÉSUMÉ DU FONCTIONNEMENT:
 # 
 # 1. INITIALISATION:
@@ -1723,4 +1718,3 @@ while running:
 # la vitesse du serpent selon le niveau choisi. Les graphismes sont
 # rendus avec des dégradés, des effets de lueur et des animations
 # pour créer une expérience visuelle moderne et attractive.
-# ====================================================================
